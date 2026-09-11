@@ -236,10 +236,19 @@ class ConnectionAttr:
 
         # Try adb in python environment
         import sys
-        file = os.path.join(sys.executable, '../Lib/site-packages/adbutils/binaries/adb.exe')
-        file = os.path.abspath(file).replace('\\', '/')
-        if os.path.exists(file):
-            return file
+        exe_dir = os.path.dirname(sys.executable)
+        candidates = [
+            # Standard venv/virtualenv layout: <venv>/Scripts/python.exe -> <venv>/Lib/...
+            os.path.join(exe_dir, '../Lib/site-packages/adbutils/binaries/adb.exe'),
+            # Upstream layout: sys.executable itself treated as a directory (frozen builds)
+            os.path.join(sys.executable, '../Lib/site-packages/adbutils/binaries/adb.exe'),
+        ]
+        # Project-local adb fallbacks (./bin/adb/adb.exe, toolkit adbutils, /usr/bin/adb)
+        candidates.extend(self.adb_binary_list)
+        for file in candidates:
+            file = os.path.abspath(file).replace('\\', '/')
+            if os.path.exists(file):
+                return file
 
         # Use adb in system PATH
         file = 'adb'
