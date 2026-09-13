@@ -143,8 +143,6 @@ class Device(Platform, Screenshot, Control, AppControl):
         Raises:
             GameStuckError:
         """
-        # [底层封死·卡死不重启] 短路: 不再判定等待超时、不抛 GameStuckError(需要恢复时删掉这一行即可)
-        return False
         reached = self.stuck_timer.reached()
         reached_long = self.stuck_timer_long.reached()
 
@@ -201,8 +199,6 @@ class Device(Platform, Screenshot, Control, AppControl):
         Raises:
             GameTooManyClickError:
         """
-        # [底层封死·卡死不重启] 短路: 不再判定重复点击、不抛 GameTooManyClickError(需要恢复时删掉这一行即可)
-        return
         count = {}
         for key in self.click_record:
             count[key] = count.get(key, 0) + 1
