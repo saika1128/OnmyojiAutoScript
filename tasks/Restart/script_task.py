@@ -21,7 +21,9 @@ class ScriptTask(LoginHandler):
         :return:
         """
         if not self.delay_pending_tasks():
-            self.app_restart()
+            # [底层封死·卡死不重启] 不再 app_stop/app_start 重启游戏, 直接把本任务排后并结束(需要恢复时改回 self.app_restart())
+            logger.warning('Restart task: auto app-restart blocked at low level, skip killing game process')
+            self.set_next_run(task='Restart', success=True, finish=True, server=True)
         raise TaskEnd('ScriptTask end')
 
     def app_stop(self):
