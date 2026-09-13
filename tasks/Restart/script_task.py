@@ -21,9 +21,8 @@ class ScriptTask(LoginHandler):
         :return:
         """
         if not self.delay_pending_tasks():
-            # [底层封死·卡死不重启] 不再 app_stop/app_start 重启游戏, 直接把本任务排后并结束(需要恢复时改回 self.app_restart())
-            logger.warning('Restart task: auto app-restart blocked at low level, skip killing game process')
-            self.set_next_run(task='Restart', success=True, finish=True, server=True)
+            # 卡死/异常后重启: 杀进程->重新拉起, 但只带到"进入游戏"登录界面即停, 不自动进庭院
+            self.app_restart()
         raise TaskEnd('ScriptTask end')
 
     def app_stop(self):
@@ -37,10 +36,11 @@ class ScriptTask(LoginHandler):
         # self.ensure_no_unfinished_campaign()
 
     def app_restart(self):
-        logger.hr('App restart')
+        logger.hr('App restart (to login page only)')
         self.device.app_stop()
         self.device.app_start()
-        self.app_handle_login()
+        # 只带到"进入游戏"登录界面即停, 不自动点击进入游戏/不进庭院
+        self.app_handle_login(to_login_only=True)
 
         # self.config.task_delay(server_update=True)
         self.set_next_run(task='Restart', success=True, finish=True, server=True)
