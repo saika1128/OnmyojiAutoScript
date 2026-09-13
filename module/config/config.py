@@ -273,6 +273,10 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         :return:
         """
         task = convert_to_underscore(task)
+        # [底层封死·卡死不重启] 任何异常恢复路径都不得自动调度 Restart(无视 force_call/即使配置被强制), 直接忽略
+        if task == 'restart':
+            logger.info(f"Task call: restart blocked at low level (auto app-restart disabled, force_call={force_call})")
+            return False
         if self.model.deep_get(self.model, keys=f'{task}.scheduler.next_run') is None:
             raise ScriptError(f"Task to call: `{task}` does not exist in user config")
 
