@@ -18,6 +18,8 @@ class LoginHandler(BaseTask, RestartAssets, GameUiAssets, GeneralBuffAssets):
         super().__init__(*wargs, **kwargs)
         self.character = self.config.restart.login_character_config.character
         self.O_LOGIN_SPECIFIC_SERVE.keyword = self.character
+        # True=重启后只走到"进入游戏"登录界面就停, 不自动点击进入游戏/不进庭院
+        self._to_login_only = False
         # self.specific_usr = kwargs['config'].
 
     def _app_handle_login(self) -> bool:
@@ -107,6 +109,10 @@ class LoginHandler(BaseTask, RestartAssets, GameUiAssets, GeneralBuffAssets):
             if self.appear_then_click(self.I_LOGIN_LOGIN_ONMYOJI_GENIE):
                 logger.info("click onmyoji genie")
                 continue
+            # [止于登录界面] 只重启到登录界面: 一旦出现选角/点击进入界面即停, 绝不点击进入
+            if getattr(self, '_to_login_only', False) and self.appear(self.I_LOGIN_SPECIFIC_SERVE):
+                logger.info('Reached character/enter login page, stop before entering game (to_login_only)')
+                return True
             # 点击屏幕进入游戏
             if self.appear(self.I_LOGIN_SPECIFIC_SERVE, interval=0.6) \
                     and self.ocr_appear_click(self.O_LOGIN_SPECIFIC_SERVE, interval=0.6):
@@ -134,6 +140,11 @@ class LoginHandler(BaseTask, RestartAssets, GameUiAssets, GeneralBuffAssets):
             # 点击’进入游戏‘
             if not self.appear(self.I_LOGIN_8):
                 continue
+
+            # [止于登录界面] 已到达带"进入游戏"按钮的登录界面即停, 不自动点击进入游戏/不进庭院
+            if getattr(self, '_to_login_only', False):
+                logger.info('Reached enter-game login page (I_LOGIN_8), stop before tapping enter (to_login_only)')
+                return True
             
             # 登录体验服时，点击“进入游戏”速度过快，可能会出现体验服的弹窗
             if self.appear(self.I_EARLY_SERVER):
@@ -146,12 +157,17 @@ class LoginHandler(BaseTask, RestartAssets, GameUiAssets, GeneralBuffAssets):
 
         return login_success
 
-    def app_handle_login(self) -> bool:
+    def app_handle_login(self, to_login_only: bool = False) -> bool:
+        # to_login_only=True 时只把游戏带到"进入游戏"登录界面就返回, 不自动进入游戏、不领取庭院奖励
+        self._to_login_only = to_login_only
         for _ in range(2):
             self.device.stuck_record_clear()
             self.device.click_record_clear()
             try:
                 self._app_handle_login()
+                if to_login_only:
+                    logger.info('Stopped at login page only (to_login_only), skip entering game and harvest')
+                    return True
                 if self.config.restart.harvest_config.enable:
                     self.harvest()
                 return True
