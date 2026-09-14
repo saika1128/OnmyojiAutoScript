@@ -6,6 +6,7 @@ import numpy as np
 
 from module.base.decorator import cached_property
 from module.base.utils.utils import random_normal_distribution_int
+from module.base.humanize import humanizer
 from module.logger import logger
 
 class RuleClick:
@@ -28,6 +29,9 @@ class RuleClick:
         获取坐标, 从roi_front随机获取坐标
         :return:
         """
+        # 拟人化空间层（开关关闭时回退上游独立正态）
+        if humanizer.enable and humanizer.space_enable:
+            return humanizer.coord(self.roi_front, self.name)
         x, y, w, h = self.roi_front
         x = random_normal_distribution_int(x, x + w)
         y = random_normal_distribution_int(y, y + h)
@@ -38,6 +42,9 @@ class RuleClick:
         从roi_back随机获取坐标
         :return:
         """
+        # 拟人化空间层
+        if humanizer.enable and humanizer.space_enable:
+            return humanizer.coord(self.roi_back, self.name)
         x, y, w, h = self.roi_back
         x = random_normal_distribution_int(x, x + w)
         y = random_normal_distribution_int(y, y + h)
