@@ -8,6 +8,7 @@ import cv2
 from module.ocr.base_ocr import BaseCor, OcrMode, OcrMethod
 from module.ocr.sub_ocr import Full, Single, Digit, DigitCounter, Duration, Quantity
 from module.base.utils.utils import random_normal_distribution_int
+from module.base.humanize import humanizer
 from module.logger import logger
 
 
@@ -55,6 +56,9 @@ class RuleOcr(Digit, DigitCounter, Duration, Single, Full, Quantity):
 		# OCR识别到并点击，在SINGLE模式下，识别到挑战，点击区域应该为ROI，而不是AREA
 		# 该地方应该是误写为self.area，本地变量area没有起作用，如果是self.area，上面几句话就白写了，没起作用
         x, y, w, h = area
+        # 拟人化空间层（开关关闭回退上游）
+        if humanizer.enable and humanizer.space_enable:
+            return humanizer.coord(area, self.name)
         x = random_normal_distribution_int(x, x + w)
         y = random_normal_distribution_int(y, y + h)
         return x, y
