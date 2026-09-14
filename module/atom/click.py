@@ -11,7 +11,8 @@ from module.logger import logger
 
 class RuleClick:
 
-    def __init__(self, roi_front: tuple, roi_back: tuple, name: str = None) -> None:
+    def __init__(self, roi_front: tuple, roi_back: tuple, name: str = None,
+                 shape=None, lobes=None) -> None:
         """
         初始化
         :param roi_front:
@@ -19,6 +20,9 @@ class RuleClick:
         """
         self.roi_front = roi_front
         self.roi_back = roi_back
+        # 可选：不规则多边形轮廓[(x,y),...]与多瓣重心[((cx,cy),w),...]，仅拟人空间层使用
+        self.shape = shape
+        self.lobes = lobes
         if name:
             self.name = name
         else:
@@ -31,7 +35,8 @@ class RuleClick:
         """
         # 拟人化空间层（开关关闭时回退上游独立正态）
         if humanizer.enable and humanizer.space_enable:
-            return humanizer.coord(self.roi_front, self.name)
+            return humanizer.coord(self.roi_front, self.name,
+                                   shape=self.shape, lobes=self.lobes)
         x, y, w, h = self.roi_front
         x = random_normal_distribution_int(x, x + w)
         y = random_normal_distribution_int(y, y + h)
