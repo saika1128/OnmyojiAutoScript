@@ -58,6 +58,21 @@ def _point_in_rect(x, y, rect):
     return rx <= x <= rx + rw and ry <= y <= ry + rh
 
 
+def point_in_polygon(x, y, poly):
+    """射线法判断点 (x,y) 是否在多边形 poly=[(x,y),...] 内（含边界）。"""
+    n = len(poly)
+    inside = False
+    j = n - 1
+    for i in range(n):
+        xi, yi = poly[i]
+        xj, yj = poly[j]
+        if ((yi > y) != (yj > y)) and \
+                (x < (xj - xi) * (y - yi) / ((yj - yi) if (yj - yi) else 1e-9) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+
 class Humanizer:
     def __init__(self):
         # 总开关与子开关（默认启用；挂载点在关闭时走原上游表达式）
@@ -124,7 +139,7 @@ class Humanizer:
             self._space_state[profile] = st
         return st
 
-    def coord(self, roi, name, blacklist=None):
+    def coord(self, roi, name, blacklist=None, shape=None, lobes=None):
         """
         在 roi=(x,y,w,h) 内生成一个拟人点，返回 (int, int)，保证落在 roi 软边界内。
 
@@ -168,6 +183,9 @@ class Humanizer:
             oy = float(np.clip(cy + by + gy + py, y + inset, y + h - inset))
             return ox, oy
 
+        if shape is not None:
+            return self._coord_shape(rng, shape, lobes, gx, gy)
+
         ox, oy = sample_once()
         if profile == PROFILE_BATTLE and blacklist:
             # 拒绝采样
@@ -187,6 +205,53 @@ class Humanizer:
             ox = float(np.clip(ox, x + 2, x + w - 2))
             oy = float(np.clip(oy, y + 2, y + h - 2))
         return int(round(ox)), int(round(oy))
+
+    def _coord_shape(self, rng, shape, lobes, gx=0.0, gy=0.0):
+        """在不规则多边形 shape 内生成拟人点（贴合非矩形可点区）。
+
+        - 多"瓣"吸引重心 lobes=[((cx,cy),weight),...]，按权重选瓣，形成自然聚簇；
+        - 瓣心叠加会话 OU 慢漂(gx,gy)与各向异性瑞利抖动；
+        - 小概率在多边形内均匀补点，填补瓣间、增加不规则感；
+        - 射线法拒绝采样，保证点落在多边形内（贴合轮廓、不越界）。
+        """
+        poly = [(float(a), float(b)) for a, b in shape]
+        xs = [p[0] for p in poly]
+        ys = [p[1] for p in poly]
+        minx, maxx, miny, maxy = min(xs), max(xs), min(ys), max(ys)
+        w, h = maxx - minx, maxy - miny
+        if lobes:
+            centers = [[float(c[0][0]), float(c[0][1])] for c in lobes]
+            wt = np.array([float(c[1]) for c in lobes], dtype=float)
+            wt = wt / wt.sum()
+        else:
+            centers = [[(minx + maxx) / 2.0, (miny + maxy) / 2.0]]
+            wt = np.array([1.0])
+
+        def one():
+            k = int(rng.choice(len(centers), p=wt))
+            if rng.random() < 0.15:
+                for _ in range(200):  # 多边形内均匀补点
+                    ux = rng.uniform(minx, maxx)
+                    uy = rng.uniform(miny, maxy)
+                    if point_in_polygon(ux, uy, poly):
+                        return ux, uy
+            cx, cy = centers[k]
+            px, py = self._rayleigh_offset(rng, 0.17 * w, 0.22 * h)
+            return cx + gx + px, cy + gy + py
+
+        for hit in range(80):
+            if hit < 32:
+                ox, oy = one()
+            else:
+                # 凹多边形：后半程改为外接框内均匀采样，快速命中形内
+                ox = rng.uniform(minx, maxx)
+                oy = rng.uniform(miny, maxy)
+            # 对取整后的整数像素再判一次，避免浮点在形内、round 后越过边界 1px
+            ix, iy = int(round(ox)), int(round(oy))
+            if point_in_polygon(ix, iy, poly):
+                return ix, iy
+        # 绝对安全兜底：主瓣心（构造时已保证落在形内），凹形也不会越界
+        return int(round(centers[0][0])), int(round(centers[0][1]))
 
     # ------------------------------------------------------------------ #
     # 时序
