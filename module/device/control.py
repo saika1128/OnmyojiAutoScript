@@ -9,7 +9,9 @@ from module.device.method.minitouch import Minitouch
 from module.device.method.adb import Adb
 from module.device.method.scrcpy import Scrcpy
 from module.device.method.windows import Window
+from module.base.humanize import humanizer
 from module.logger import logger
+import time
 
 
 class Control(Minitouch, Adb, Scrcpy, Window):
@@ -75,6 +77,10 @@ class Control(Minitouch, Adb, Scrcpy, Window):
         logger.info(
             'Click %s @ %s' % (point2str(x, y), control_name)
         )
+        # 拟人化时序：点击前人类反应时（开关关闭时返回 0，不等待）
+        _delay = humanizer.pre_click_delay(control_name)
+        if _delay > 0:
+            time.sleep(_delay)
         method = self.click_methods.get(
             self.config.script.device.control_method,
             self.click_adb
