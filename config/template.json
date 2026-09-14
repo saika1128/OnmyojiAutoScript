@@ -41,6 +41,14 @@
       "sleep_end": "08:00:00",
       "daily_active_limit": "00 00:00:00",
       "long_rest_duration": "00 02:00:00"
+    },
+    "humanize": {
+      "enable": true,
+      "space_enable": true,
+      "timing_enable": true,
+      "dwell_enable": true,
+      "path_enable": true,
+      "pure_time_seed": false
     }
   },
   "restart": {
