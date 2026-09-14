@@ -632,6 +632,27 @@ class Script:
         self.config.model.running_task = ''
         self.anti_ban_guard.reset()
 
+        # [自用拟人化] 每次启动调度循环时，把开关同步到全局 humanizer 并重新播种会话
+        try:
+            from module.base.humanize import humanizer
+            hz = self.config.script.humanize
+            humanizer.configure(
+                enable=hz.enable,
+                space_enable=hz.space_enable,
+                timing_enable=hz.timing_enable,
+                dwell_enable=hz.dwell_enable,
+                path_enable=hz.path_enable,
+                pure_time_seed=hz.pure_time_seed,
+            )
+            humanizer.reset()
+            logger.info(
+                f'Humanizer enable={hz.enable} space={hz.space_enable} '
+                f'timing={hz.timing_enable} dwell={hz.dwell_enable} '
+                f'path={hz.path_enable} pure_time_seed={hz.pure_time_seed}'
+            )
+        except Exception as e:
+            logger.warning(f'Humanizer configure skipped: {e}')
+
         # Update GUI 防呆, 读取设置并立刻显示后台模拟器到前台
         if not self.config.script.device.run_background_only and IS_WINDOWS:
             from module.device.platform2.platform_windows import minimize_by_name, show_window_by_name
