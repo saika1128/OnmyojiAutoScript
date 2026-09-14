@@ -11,6 +11,7 @@ from module.atom.RuleImageMallResourceMixin import RuleImageMallResourceMixin
 from module.base.decorator import cached_property
 from module.logger import logger
 from module.base.utils import is_approx_rectangle
+from module.base.humanize import humanizer
 
 
 class RuleImage(RuleImageMallResourceMixin):
@@ -306,6 +307,9 @@ class RuleImage(RuleImageMallResourceMixin):
         获取roi_front的随机的点击的坐标
         :return:
         """
+        # 拟人化空间层（模板匹配块内小幅瑞利，关闭回退上游）
+        if humanizer.enable and humanizer.space_enable:
+            return humanizer.coord(self.roi_front, self.name)
         x, y, w, h = self.roi_front
         return x + np.random.randint(0, w), y + np.random.randint(0, h)
 
@@ -314,6 +318,9 @@ class RuleImage(RuleImageMallResourceMixin):
          获取roi_back的随机的点击的坐标
         :return:
         """
+        # 拟人化空间层
+        if humanizer.enable and humanizer.space_enable:
+            return humanizer.coord(self.roi_back, self.name)
         x, y, w, h = self.roi_back
         return x + np.random.randint(0, w), y + np.random.randint(0, h)
 

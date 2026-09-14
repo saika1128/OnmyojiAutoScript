@@ -34,6 +34,10 @@ class RaidConfig(BaseModel):
     order_attack: str = Field(title='Order Attack', default='5 > 4 > 3 > 2 > 1 > 0', description='order_attack_help')
     three_refresh: bool = Field(title='Three Refresh', default=False, description='three_refresh_help')
     when_attack_fail: WhenAttackFail = Field(title='WhenAttackFail', default=WhenAttackFail.REFRESH, description='when_attack_fail_help')
+    # 同一勋章档位同时存在多个对手时: False=取模板匹配度最高者(原逻辑), True=改取匹配度最低者
+    lowest_same_rank: bool = Field(title='Lowest Same Rank', default=False, description='lowest_same_rank_help')
+    # lowest_same_rank=True 时生效: 只在匹配度不低于该下限的达标候选里挑最低, 避免误选非勋章元素
+    lowest_rank_floor: float = Field(title='Lowest Rank Floor', default=0.85, ge=0.5, le=0.99, description='lowest_rank_floor_help')
 
 class RealmRaid(ConfigBase):
     scheduler: Scheduler = Field(default_factory=Scheduler)

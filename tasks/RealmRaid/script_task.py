@@ -339,6 +339,35 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RealmRaidAssets):
             images.append(match[i])
         return ImageGrid(images)
 
+    def _pick_medal(self, image):
+        """
+        按 order_attack 的档位顺序挑选一个可挑战勋章。
+        - lowest_same_rank=False(默认): 沿用原逻辑, 同档取模板匹配度最高者。
+        - lowest_same_rank=True: 同一档位存在多个达标候选时改取匹配度最低者;
+          但只在匹配度 >= lowest_rank_floor 的候选里挑(低于下限不算该档),
+          且后续仍要通过 find_one 的九宫格 partition 空间过滤, 双重避免误选非勋章元素。
+        选中后把全图坐标写回该 RuleImage.roi_front, 供 front_center/九宫格定位复用。
+        """
+        raid = self.config.realm_raid.raid_config
+        if not raid.lowest_same_rank:
+            return self.order_medal.find_anyone(image)
+
+        floor = raid.lowest_rank_floor
+        for medal in self.order_medal.images:
+            # match_all_any 已做 NMS: 不同格子各保留一个达标框, 返回 [(score, x, y, w, h), ...]
+            candidates = medal.match_all_any(image, threshold=floor)
+            if not candidates:
+                continue
+            chosen = min(candidates, key=lambda item: item[0])
+            scores = ', '.join(f'{item[0]:.3f}' for item in candidates)
+            logger.info(f'Same-rank {len(candidates)} candidate(s) score [{scores}], pick the lowest {chosen[0]:.3f}')
+            medal.roi_front[0] = int(chosen[1])
+            medal.roi_front[1] = int(chosen[2])
+            medal.roi_front[2] = int(chosen[3])
+            medal.roi_front[3] = int(chosen[4])
+            return medal
+        return None
+
     @cached_property
     def partition(self) -> list[RuleClick]:
         return [self.C_PARTITION_1, self.C_PARTITION_2, self.C_PARTITION_3, self.C_PARTITION_4, self.C_PARTITION_5,
@@ -368,7 +397,7 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RealmRaidAssets):
                 x, y, w, h = self.partition[i].roi_back
                 image[y:y+h, x:x+w, ...] = 0
         # -----------------------------------------------------
-        target = self.order_medal.find_anyone(image)
+        target = self._pick_medal(image)
         if target:
             center = target.front_center()
             for i, click in enumerate(self.partition):

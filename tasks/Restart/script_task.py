@@ -38,7 +38,7 @@ class ScriptTask(LoginHandler):
         logger.hr('App restart')
         self.device.app_stop()
         self.device.app_start()
-        self.app_handle_login()
+        self.app_handle_login(to_login_only=True)
 
         # self.config.task_delay(server_update=True)
         self.set_next_run(task='Restart', success=True, finish=True, server=True)

@@ -7,6 +7,7 @@ import cv2
 
 from module.ocr.base_ocr import BaseCor, OcrMode, OcrMethod
 from module.ocr.sub_ocr import Full, Single, Digit, DigitCounter, Duration, Quantity
+from module.base.humanize import humanizer
 from module.logger import logger
 
 
@@ -49,7 +50,10 @@ class RuleOcr(Digit, DigitCounter, Duration, Single, Full, Quantity):
         else:
             area = self.roi
 
-        x, y, w, h = self.area
+        x, y, w, h = area
+        # 拟人化空间层（开关关闭回退上游；并修正上游误用 self.area 导致局部 area 失效）
+        if humanizer.enable and humanizer.space_enable:
+            return humanizer.coord(area, self.name)
         x = np.random.randint(x, x + w)
         y = np.random.randint(y, y + h)
         return x, y
