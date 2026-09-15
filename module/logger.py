@@ -6,6 +6,7 @@ import sys
 import logging
 import os
 import shutil
+import threading
 from datetime import datetime, timedelta, date
 from io import TextIOBase
 from pathlib import Path
@@ -163,11 +164,76 @@ def set_file_logger(name=pyw_name, *, do_cleanup=False):
         h, (logging.FileHandler, RichFileHandler))]
     logger.addHandler(hdlr)
     logger.log_file = log_file
+    # 启动“每 10 分钟自动清空当前日志”的后台守护线程（全局只会启动一次）
+    _start_log_maintainer()
 
     # ---------- 可选：清理旧文件 ----------
     if do_cleanup:
         cleanup_logs()
         logger.info("Log cleanup finished")
+
+
+# ======================================================================================================================
+#   运行中日志自动清空（防止单个日志文件无限增长、前端反复读取导致越跑越卡）
+# ======================================================================================================================
+LOG_AUTO_CLEAR_INTERVAL = 600  # 单位秒，600 = 10 分钟
+_log_maintainer_lock = threading.Lock()
+_log_maintainer_started = False
+
+
+def _current_log_file_stream():
+    """返回当前文件日志 handler 正在写入的文件流；没有则返回 None。"""
+    for hdlr in logger.handlers:
+        if isinstance(hdlr, RichFileHandler):
+            try:
+                return hdlr.console.file
+            except Exception:
+                return None
+    return None
+
+
+def clear_current_log_file() -> bool:
+    """把当前日志文件就地截断清空（不换文件、不换句柄，读取方无感知）。
+
+    任何异常都就地吞掉，日志维护绝不能影响主业务。
+    """
+    try:
+        stream = _current_log_file_stream()
+        if stream is None or getattr(stream, 'closed', False):
+            return False
+        stream.seek(0)
+        stream.truncate()
+        stream.flush()
+        return True
+    except Exception:
+        return False
+
+
+def _log_maintainer_loop(stop_event: threading.Event):
+    # 用 Event.wait 做可中断的周期等待；到点就清空一次当前日志
+    while not stop_event.wait(LOG_AUTO_CLEAR_INTERVAL):
+        try:
+            if clear_current_log_file():
+                logger.info(
+                    f'[log-maintainer] 已按 {LOG_AUTO_CLEAR_INTERVAL // 60} 分钟周期自动清空日志')
+        except Exception:
+            pass
+
+
+def _start_log_maintainer():
+    global _log_maintainer_started
+    with _log_maintainer_lock:
+        if _log_maintainer_started:
+            return
+        stop_event = threading.Event()
+        maintainer = threading.Thread(
+            target=_log_maintainer_loop,
+            args=(stop_event,),
+            name='log-maintainer',
+            daemon=True,
+        )
+        maintainer.start()
+        _log_maintainer_started = True
 
 
 # ======================================================================================================================
