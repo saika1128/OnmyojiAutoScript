@@ -3,6 +3,7 @@ import json
 import re
 import socket
 import time
+import random
 import numpy as np
 from functools import wraps
 from typing import List
@@ -410,8 +411,11 @@ class Minitouch(Connection):
     max_pressure: int = 100
 
     def _humanized_pressure(self) -> int:
-        top = getattr(self, 'max_pressure', 100) or 100
-        return random.randint(max(20, top // 2), top)
+        # MuMu 专用，恒为 0。
+        # 实测：物理鼠标经 MuMu 鼠标集成在 /dev/input/event4 上从不上报 ABS_MT_PRESSURE 轴；
+        # 而 minitouch 的 pressure 字段必填、无法省略该轴，显式发 0 最接近真实输入。
+        # 发非 0 会被 MuMu 原样透传成真实输入里不存在的压力序列（设备 max_pressure=0），反而暴露。
+        return 0
 
     def _humanized_dwell(self) -> int:
         # 拟人化按压时长：对数正态（开关关闭回退上游固定区间）
@@ -481,7 +485,10 @@ class Minitouch(Connection):
         # self.max_contacts = max_contacts
         self.max_x = int(max_x)
         self.max_y = int(max_y)
-        # self.max_pressure = max_pressure
+        try:
+            self.max_pressure = int(max_pressure)
+        except (ValueError, TypeError):
+            self.max_pressure = 100
 
         # $ <pid>
         out = socket_out.readline().replace("\n", "").replace("\r", "")
@@ -593,7 +600,7 @@ class Minitouch(Connection):
     def long_click_minitouch(self, x, y, duration=1.0):
         duration = int(duration * 1000)
         builder = self.minitouch_builder
-        builder.down(x, y).commit().wait(duration)
+        builder.down(x, y, pressure=self._humanized_pressure()).commit().wait(duration)
         builder.up().commit()
         self.minitouch_send()
 
@@ -603,12 +610,13 @@ class Minitouch(Connection):
         # 拟人化轨迹：相关高斯法向抖动 + 末段 ease-out + 小概率过冲回拉；关闭时等价上游
         points, waits = humanizer.refine_swipe(points)
         builder = self.minitouch_builder
+        pressure = self._humanized_pressure()
 
-        builder.down(*points[0]).commit()
+        builder.down(points[0][0], points[0][1], pressure=pressure).commit()
         self.minitouch_send()
 
         for point, _wait in zip(points[1:], waits[1:]):
-            builder.move(*point).commit().wait(_wait)
+            builder.move(point[0], point[1], pressure=pressure).commit().wait(_wait)
         self.minitouch_send()
 
         builder.up().commit()
@@ -620,16 +628,17 @@ class Minitouch(Connection):
         p2 = np.array(p2) - random_rectangle_point(point_random)
         points = insert_swipe(p0=p1, p3=p2, speed=20)
         builder = self.minitouch_builder
+        pressure = self._humanized_pressure()
 
-        builder.down(*points[0]).commit()
+        builder.down(points[0][0], points[0][1], pressure=pressure).commit()
         self.minitouch_send()
 
         for point in points[1:]:
-            builder.move(*point).commit().wait(random.randint(6, 15))
+            builder.move(point[0], point[1], pressure=pressure).commit().wait(random.randint(6, 15))
         self.minitouch_send()
 
-        builder.move(*p2).commit().wait(140)
-        builder.move(*p2).commit().wait(140)
+        builder.move(p2[0], p2[1], pressure=pressure).commit().wait(140)
+        builder.move(p2[0], p2[1], pressure=pressure).commit().wait(140)
         self.minitouch_send()
 
         builder.up().commit()

@@ -31,10 +31,13 @@ class SoloExploration(BaseExploration):
         logger.hr('solo')
         explore_init = False
         search_fail_cnt = 0
+        unknown_cnt = 0
 
         while 1:
             self.screenshot()
             scene = self.get_current_scene()
+            if scene != Scene.UNKNOWN:
+                unknown_cnt = 0
 
             #
             if scene == Scene.WORLD:
@@ -93,6 +96,12 @@ class SoloExploration(BaseExploration):
             elif scene == Scene.BATTLE_PREPARE or scene == Scene.BATTLE_FIGHTING:
                 self.check_take_over_battle(is_screenshot=False, config=self._config.general_battle_config)
             elif scene == Scene.UNKNOWN:
+                # 连续多轮识别不到场景，走 UI 导航回探索自救，避免只空转、干等到卡死重启
+                unknown_cnt += 1
+                if unknown_cnt >= 10:
+                    logger.warning(f'Unknown scene for {unknown_cnt} rounds, recover by pre_process')
+                    self.pre_process()
+                    unknown_cnt = 0
                 continue
 
     def run_leader(self):
@@ -429,20 +438,9 @@ class SoloExploration(BaseExploration):
 class ScriptTask(SoloExploration):
     def run(self):
         logger.hr('exploration')
-        random_click_cnt = 0
-        while 1:
-            self.screenshot()
-            scene = self.get_current_scene()
-            if random_click_cnt >= 2:
-                break
-            if scene == Scene.UNKNOWN:
-                logger.warning('Unknown scene, random click')
-                if self.click(self.C_SAFE_RANDOM, interval=1.5):
-                    random_click_cnt += 1
-                continue
-            else:
-                break
-
+        # 开局不在左上角盲点（旧 safe_random 会误触头像）；识别不到场景直接交给 UI 导航回探索
+        self.screenshot()
+        scene = self.get_current_scene()
         if scene == Scene.UNKNOWN:
             self.pre_process()
 

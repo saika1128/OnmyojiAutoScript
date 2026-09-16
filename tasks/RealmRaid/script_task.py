@@ -3,6 +3,7 @@
 # github https://github.com/runhey
 import time
 import re
+from datetime import datetime
 from cached_property import cached_property
 
 from tasks.base_task import BaseTask
@@ -33,12 +34,52 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RealmRaidAssets):
         :return:
         """
         self.wait_until_appear(self.I_BACK_RED)
-        self.screenshot()
-        cu, res, total = self.O_NUMBER.ocr(self.device.image)
+        cu, res, total = self._read_ticket()
+        # 多次仍读不到分母属于识别失败，不据此判无票（保守放行，由点火确认兜底）
+        if total == 0:
+            return True
         if cu == 0 and cu + res == total:
             logger.warning(f'Execute round failed, no ticket')
             return False
         return True
+
+    def _read_ticket(self, tries: int = 7, interval: float = 0.7):
+        """
+        读取突破券数量 (cu, res, total)。
+        total==0 表示当帧连分母都没读到（战斗返回转场/三胜奖励遮挡，OCR 单帧不稳，
+        上游同类问题见 runhey issue#1802 及门票 OCR 误读 issue），这不等同于“没票”，
+        限时重读并顺手点掉遮挡，直到拿到稳定分母。
+        """
+        cu = res = total = 0
+        for n in range(tries):
+            self.screenshot()
+            cu, res, total = self.O_NUMBER.ocr(self.device.image)
+            if total > 0:
+                if n > 0:
+                    logger.info(f'Ticket readable after {n + 1} tries: {cu}/{total}')
+                return cu, res, total
+            # 当帧读空：尝试点掉三胜奖励/聊天框遮挡，等待界面稳定后再读
+            self.reward_detect_click(True)
+            time.sleep(interval)
+        logger.warning(f'Ticket OCR unreadable after {tries} tries')
+        return cu, res, total
+
+    def _ensure_battle_started(self, timeout: float = 8.0) -> bool:
+        """
+        点火后确认确实进入了“准备/战斗/结算”流程。
+        无券或目标失效时点火无任何响应，及时判定失败回到主循环重查，
+        避免在 battle_wait 里空等全局 60s 卡死（上游 issue#1802）。
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            self.screenshot()
+            if (self.is_in_prepare(False) or
+                    self.is_in_real_battle(False) or
+                    self.is_in_battle(False)):
+                return True
+            time.sleep(0.5)
+        logger.warning(f'Fire did not lead to battle within {timeout:.1f}s, abort this attempt')
+        return False
 
     def medal_fire(self) -> bool:
         """
@@ -205,6 +246,10 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RealmRaidAssets):
                 # 如果挑战的这只是呱太的话，就要把锁定改为不锁定
                 con.general_battle_config.lock_team_enable = False
             self.fire(index)
+            # 点火后确认真的进了准备/战斗流程；无券或目标失效导致点火无响应时，
+            # 回到循环顶部重新查票/找目标，避免在通用战斗里空等全局 60s 超时
+            if not self._ensure_battle_started():
+                continue
             last_battle = self.run_general_battle(con.general_battle_config)
             if lock_before:
                 con.general_battle_config.lock_team_enable = lock_before
@@ -238,6 +283,8 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RealmRaidAssets):
         self.ui_get_current_page()
         self.ui_goto(page_main)
         self.set_next_run(task='RealmRaid', success=success, finish=True)
+        # 票空/本轮打完后立刻把探索接上，形成“探索攒票→票满突破→票空回探索”的无限循环
+        self.set_next_run(task='Exploration', success=False, finish=False, target=datetime.now())
         raise TaskEnd
 
 
@@ -302,13 +349,14 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RealmRaidAssets):
             logger.warning(f'It is not a valid base {base}')
             base = 0
         self.wait_until_appear(self.I_BACK_RED)
-        self.screenshot()
-        cu, res, total = self.O_NUMBER.ocr(self.device.image)
-
+        # 票数 OCR 单帧不稳：读空(连分母都没有)时限时重读，而不是直接判无票
+        cu, res, total = self._read_ticket()
         if total == 0:
-            self.reward_detect_click(True)
-            # 增加出现聊天框遮挡，处理奖励之后，重新识别票数
-            cu, res, total = self.O_NUMBER.ocr(self.device.image)
+            # 连续多次仍读不到分母 = 识别失败而非确认无票。保守放行本轮，
+            # 避免一次读空就把 RealmRaid 排到次日；若确无券，点火确认守卫会及时回退
+            logger.warning('Ticket unreadable, keep this round instead of quitting')
+            return True
+        # 只有稳定读到 0/总数(total>0 且 cu==0) 才是真·没票
         if cu == 0 and cu + res == total:
             logger.warning(f'Execute raid failed, no ticket')
             return False

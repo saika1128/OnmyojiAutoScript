@@ -2,6 +2,7 @@
 # @author runhey
 # github https://github.com/runhey
 import time
+import re
 import numpy as np
 import random
 from enum import Enum
@@ -63,7 +64,8 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
 
         if self.appear(self.I_CHECK_EXPLORATION) and not self.appear(self.I_E_SETTINGS_BUTTON):
             return Scene.WORLD
-        elif self.appear(self.I_UI_BACK_RED) and self.appear(self.I_E_EXPLORATION_CLICK):
+        elif self.appear(self.I_E_EXPLORATION_CLICK) and self.appear(self.I_EXP_CREATE_TEAM):
+            # 新版章节详情弹窗无红色返回(I_UI_BACK_RED失配)，改用"探索+组队"双菱形按钮识别
             return Scene.ENTRANCE
         elif self.appear(self.I_E_SETTINGS_BUTTON) or self.appear(self.I_E_AUTO_ROTATE_ON) or self.appear(self.I_E_AUTO_ROTATE_OFF):
             return Scene.MAIN
@@ -111,9 +113,11 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
         self.ui_goto(page_exploration)
 
     def post_process(self):
-        self.wait_until_stable(self.I_UI_BACK_RED)
-        if self.appear(self.I_UI_BACK_RED):
-            self.ui_click_until_disappear(self.I_UI_BACK_RED)
+        # 新版详情弹窗无红色返回：用探索+组队双按钮识别，命中则点左上金黄返回回大世界，避免空等50s
+        self.screenshot()
+        if self.appear(self.I_E_EXPLORATION_CLICK) and self.appear(self.I_EXP_CREATE_TEAM):
+            self.click((36, 40))
+            self.sleep(1)
         self.ui_get_current_page()
         self.ui_goto(page_main)
         con = self._config.exploration_config
@@ -127,9 +131,18 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
         self.set_next_run(task='Exploration', success=True, finish=False)
         raise TaskEnd
 
-    # 打开指定的章节：
+    # 打开指定的章节：先检测目标章是否在当前列表，在则点；不在才下滑，且全程有界
     def open_expect_level(self):
+        MAX_SWIPE = 15          # 总滑动硬上限（28章、每次跨约2行，最多8次到尾，15为冗余）
+        MAX_STALE = 3           # 连续多少次滑动后列表毫无变化即熔断（手势没作用于列表）
+        MAX_SELECT = 8          # 选中章节循环硬上限
         swipeCount = 0
+        staleCount = 0
+        lastSig = None
+        # 目标章节归一化核心（"第二十八章"->"二十八章"），免疫OCR把"第"误识成"名"等
+        level_name = self.config.exploration.exploration_config.exploration_level
+        _m = re.search(r'([零〇一二三四五六七八九十百千两0-9]+章)', level_name)
+        target_core = _m.group(1) if _m else level_name
         while 1:
             # 探索的 config
             explorationConfig = self.config.exploration
@@ -139,41 +152,67 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
             # 获取当前章节名
             results = self.O_E_EXPLORATION_LEVEL_NUMBER.detect_and_ocr(self.device.image)
             text1 = [result.ocr_text for result in results]
-            # 判断当前章节有无目标章节
-            result = set(text1).intersection({explorationConfig.exploration_config.exploration_level})
+            # 判断当前章节有无目标章节：归一化到"数字+章"核心再比对，
+            # 免疫OCR把"第"误识成"名"（如"名二十八章"）导致永远匹配不上
+            hit = False
+            for t in text1:
+                mm = re.search(r'([零〇一二三四五六七八九十百千两0-9]+章)', t)
+                if mm and mm.group(1) == target_core:
+                    hit = True
+                    break
             # 有则跳出检测
-            if self.appear(self.I_E_EXPLORATION_CLICK) or result and len(result) > 0:
+            if self.appear(self.I_E_EXPLORATION_CLICK) or hit:
                 break
             if self.appear_then_click(self.I_UI_CONFIRM, interval=1):
                 continue
             if self.appear_then_click(self.I_UI_CONFIRM_SAMLL, interval=1):
                 continue
-            self.device.click_record_clear()
-            self.swipe(self.S_SWIPE_LEVEL_UP)
+            # 列表指纹：与上一轮可见章节比对，相同说明上一次滚动没让列表移动
+            sig = tuple(sorted(text1))
+            staleCount = staleCount + 1 if (lastSig is not None and sig == lastSig) else 0
+            lastSig = sig
+            # MuMu对阴阳师章节列表有鼠标滚轮优化：后台投递滚轮(向下=章号更大=找第28章)，
+            # 不移动系统真实鼠标、不抢前台，更贴近PC真人；非Windows通道才回退由下向上触屏滑
+            if hasattr(self, 'wheel_window_message'):
+                self.wheel_window_message(1150, 400, ticks=1, down=True)
+            else:
+                self.swipe([1150, 500], [1150, 300])
             swipeCount += 1
-            debug_info = f"Swiped {swipeCount} times, current exploration level: {text1}"
-            logger.info(debug_info)
-            if swipeCount >= 25:
+            logger.info(f"Scroll level list {swipeCount} times (stale {staleCount}), levels: {text1}")
+            # 连续多次纹丝不动：手势未作用于列表，提前熔断而非空转
+            if staleCount >= MAX_STALE:
+                raise GameStuckError(
+                    f"Level list not moving after {swipeCount} swipes ({MAX_STALE}x stale), "
+                    f"stuck in exploration level selection"
+                )
+            # 总次数硬上限，绝不无限滑动
+            if swipeCount >= MAX_SWIPE:
                 raise GameStuckError(
                     f"Swiped too many times ({swipeCount}), seems stuck in exploration level selection"
                 )
-                return False
             time.sleep(1)
 
-        # 选中对应章节
+        # 选中对应章节（同样有界）
+        selectCount = 0
         while 1:
             self.screenshot()
             if self.appear_then_click(self.I_UI_CONFIRM, interval=1):
                 continue
             if self.appear_then_click(self.I_UI_CONFIRM_SAMLL, interval=1):
                 continue
-            self.O_E_EXPLORATION_LEVEL_NUMBER.keyword = explorationConfig.exploration_config.exploration_level
+            # 用"数字+章"核心做包含匹配，OCR把"第"误识成"名"也能命中该行并点击
+            self.O_E_EXPLORATION_LEVEL_NUMBER.keyword = target_core
             if self.ocr_appear_click(self.O_E_EXPLORATION_LEVEL_NUMBER):
                 self.wait_until_appear(self.I_E_EXPLORATION_CLICK, wait_time=3)
             if self.appear(self.I_E_EXPLORATION_CLICK):
                 break
             if self.is_in_room():
                 break
+            selectCount += 1
+            if selectCount >= MAX_SELECT:
+                raise GameStuckError(
+                    f"Clicked target level {MAX_SELECT} times but detail dialog did not appear"
+                )
 
         return True
 
@@ -204,6 +243,42 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
         else:
             self.add_shiki()
 
+    def _read_alternate_count(self):
+        """读取候补出战当前数量，OCR失败返回None（不抛异常打断流程）"""
+        try:
+            cu, res, total = self.O_E_ALTERNATE_NUMBER.ocr(self.device.image)
+            return cu
+        except Exception as e:
+            logger.warning('Read alternate number failed: %s' % e)
+            return None
+
+    def _switch_rarity_arc(self, rarity) -> bool:
+        """
+        新版周年庆UI：左下角只有一个"全部"按钮，点它后稀有度沿弧形展开。
+        已选中目标 -> 返回；弧形目标可见 -> 点它；否则点"全部"展开。带硬上限，绝不死循环。
+        """
+        if rarity == ShikigamiClass.N:
+            img_selected, img_arc = self.I_E_N_RARITY, self.I_E_ARC_N
+        else:
+            img_selected, img_arc = self.I_E_S_RARITY, self.I_E_ENTER_CHOOSE_RARITY
+        for _ in range(8):
+            self.screenshot()
+            # 左下筛选钮已是目标稀有度 = 已选中
+            if self.appear(img_selected):
+                logger.info('Rarity selected: %s' % rarity)
+                return True
+            if rarity == ShikigamiClass.N:
+                if self.appear(img_arc):
+                    self.click(self.C_CLICK_N_SHIKI, interval=1)      # 点弧形N（区域随机点）
+                else:
+                    self.click(self.C_CLICK_ALL_SHIKI, interval=1)    # 点"全部"展开弧形
+            else:
+                if not self.appear_then_click(img_arc, interval=1):
+                    self.click(self.C_CLICK_ALL_SHIKI, interval=1)
+            time.sleep(0.8)
+        logger.error('Switch rarity failed after 8 attempts: %s' % rarity)
+        return False
+
     # 添加式神
     def add_shiki(self, screenshot=True):
         if screenshot:
@@ -212,40 +287,51 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
                 logger.warning('Opening settings failed due to now in battle')
                 return
 
-        # 先点候补式神区域，再切换稀有度，避免点击失败
+        # 1. 先点"候补出战"标题把编辑焦点切到候补（点安全区，避免压到已候补卡而误移除）
         self.click(self.C_CLICK_STANDBY_TEAM)
 
+        # 2. 新版弧形菜单选择稀有度（N卡/素材），失败则放弃本次添加
         choose_rarity = self._config.exploration_config.choose_rarity
         rarity = ShikigamiClass.N if choose_rarity == ChooseRarity.N else ShikigamiClass.MATERIAL
-        self.switch_shikigami_class(rarity)
+        if not self._switch_rarity_arc(rarity):
+            logger.warning('Switch rarity failed, abort add_shiki')
+            return
 
-        # 移动至未候补的狗粮
-        while 1:
-            # 慢一点
+        # 3. 结果反馈式补狗粮：
+        #    长按固定槽约2.8s可批量加入10个同种；灰色(已选)/满级/上锁的卡长按无增量，
+        #    此时左滑一格换下一张，直到数量>=目标。所有循环都有硬上限。
+        TARGET_COUNT = 40       # 候补补到该数量即停
+        MAX_LONGPRESS = 12      # 长按次数硬上限
+        MAX_NO_GAIN = 10        # 连续多少次滑动仍无增量即认为列表到头
+        no_gain = 0
+        for ops in range(MAX_LONGPRESS):
             time.sleep(0.5)
             self.screenshot()
             if not self.appear(self.I_E_OPEN_SETTINGS):
                 logger.warning('Opening settings failed due to now in battle')
                 return
-            if self.appear(self.I_E_RATATE_EXSIT):
-                self.swipe(self.S_SWIPE_SHIKI_TO_LEFT)
-            else:
+            before = self._read_alternate_count()
+            if before is not None and before >= TARGET_COUNT:
                 break
-        while 1:
-            # 候补出战数量识别
-            self.screenshot()
-            if not self.appear(self.I_E_OPEN_SETTINGS):
-                logger.warning('Opening settings failed due to now in battle')
-                return
-            cu, res, total = self.O_E_ALTERNATE_NUMBER.ocr(self.device.image)
-            if cu >= 40:
-                break
-            self.swipe(self.S_SWIPE_SHIKI_TO_LEFT_ONE)
-            # 慢一点
-            time.sleep(0.5)
-            self.screenshot()
+
+            # 长按固定槽批量加入（RuleLongClick：区域随机点+随机按压时长，走humanize防封）
             self.click(self.L_ROTATE_1)
             self.device.click_record_clear()
+            time.sleep(0.6)
+
+            self.screenshot()
+            after = self._read_alternate_count()
+            if after is not None and before is not None and after > before:
+                # 成功加入同种，继续长按（余量充足时可继续批量加）
+                no_gain = 0
+                continue
+
+            # 无增量：当前槽位是灰色已选/满级/上锁卡，左滑一格换下一张
+            self.swipe(self.S_SWIPE_SHIKI_TO_LEFT_ONE)
+            no_gain += 1
+            if no_gain >= MAX_NO_GAIN:
+                logger.warning('No gain after %d swipes, stop adding (count=%s)' % (no_gain, after))
+                break
 
         self.appear_then_click(self.I_E_SURE_BUTTON)
 
@@ -381,8 +467,8 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
         while 1:
             self.screenshot()
             
-            #探索章节标题界面
-            if self.appear(self.I_UI_BACK_RED) and self.appear(self.I_E_EXPLORATION_CLICK):
+            #探索章节标题界面（新版无红色返回，用探索+组队双按钮识别详情弹窗）
+            if self.appear(self.I_E_EXPLORATION_CLICK) and self.appear(self.I_EXP_CREATE_TEAM):
                 break
             
             #探索大世界界面

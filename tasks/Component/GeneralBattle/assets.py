@@ -17,8 +17,10 @@ class GeneralBattleAssets:
 	C_WIN_2 = RuleClick(roi_front=(22,112,210,496), roi_back=(22,112,210,496), name="win_2")
 	# description 
 	C_WIN_3 = RuleClick(roi_front=(1059,114,206,468), roi_back=(1059,114,206,468), name="win_3")
-	# description 
-	C_REWARD_1 = RuleClick(roi_front=(606,603,325,87), roi_back=(606,603,325,87), name="reward_1")
+	# description
+	# 底部连点区上移到 y540-620：原 y603-690 压着探索详情页底栏的“式神录(~820,690)/队伍预设/
+	# 固定阵容”，结算遮罩淡出的最后一下会点穿到详情页，误开式神录（进而触发音频扩展包弹窗卡死）
+	C_REWARD_1 = RuleClick(roi_front=(606,540,325,80), roi_back=(606,540,325,80), name="reward_1")
 	# description 
 	C_REWARD_2 = RuleClick(roi_front=(25,134,224,472), roi_back=(25,134,224,472), name="reward_2")
 	# description 

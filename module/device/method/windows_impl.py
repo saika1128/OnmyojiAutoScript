@@ -11,7 +11,7 @@ from cached_property import cached_property
 from win32gui import (GetWindowText, EnumWindows, FindWindow, FindWindowEx,
                       IsWindow, GetWindowRect, GetWindowDC, DeleteObject,
                       SetForegroundWindow, IsWindowVisible, GetDC, GetParent,
-                      EnumChildWindows, SetForegroundWindow)
+                      EnumChildWindows, SetForegroundWindow, ClientToScreen)
 from win32con import (SRCCOPY, DESKTOPHORZRES, DESKTOPVERTRES, WM_LBUTTONUP,
                       WM_LBUTTONDOWN, WM_ACTIVATE, WA_ACTIVE, MK_LBUTTON,
                       WM_NCHITTEST, WM_SETCURSOR, HTCLIENT, WM_MOUSEMOVE,
@@ -356,6 +356,40 @@ class Window(Handle):
             time.sleep(0.5)
         # 抄网上的
         # SendMessage(handle_num, WM_NCHITTEST, 0, lparam)
+
+    def wheel_window_message(self, x: int, y: int, ticks: int = 1, down: bool = True,
+                             pos_jitter=(28, 70), gap_range=(0.10, 0.30),
+                             line_choices=(1, 1, 1, 2, 2, 3)) -> None:
+        """
+        后台鼠标滚轮：只 PostMessage 定向投递到模拟器窗口，不移动系统真实光标、不抢前台、不点击。
+        实测 MuMu12：lParam 必须是 ClientToScreen 屏幕坐标、发给 control_handle_list[1]。
+        down=True：章节列表向更靠后(章号更大)滚动，用于找第28章。
+        拟人随机：
+          - 悬停落点以(x,y)为中心在 pos_jitter 范围内随机（仍落在列表内），物理光标不动；
+          - 每个滚轮事件随机滚 1~3 格（delta 恒为 WHEEL_DELTA=120 的整数倍，符合真实硬件）；
+          - 格间停顿在 gap_range 内随机。
+        """
+        direction = -1 if down else 1
+        if self.emulator_family == EmulatorFamily.FAMILY_MUMU:
+            handle = self.control_handle_list[1]
+        else:
+            handle = self.control_handle_list[0]
+        # 随机悬停落点（逻辑光标，真实系统光标不动）
+        jx = int(x) + int(np.random.randint(-pos_jitter[0], pos_jitter[0] + 1))
+        jy = int(y) + int(np.random.randint(-pos_jitter[1], pos_jitter[1] + 1))
+        cx, cy = int(jx / self.window_scale_rate), int(jy / self.window_scale_rate)
+        sx, sy = ClientToScreen(handle, (cx, cy))
+        lparam = MAKELONG(sx, sy)
+        SendMessage(handle, WM_NCHITTEST, 0, lparam)
+        for _ in range(2):
+            PostMessage(handle, WM_SETCURSOR, handle, lparam)
+            PostMessage(handle, WM_MOUSEMOVE, 0, lparam)
+            time.sleep(float(np.random.uniform(0.02, 0.06)))
+        for _ in range(max(1, int(ticks))):
+            lines = int(np.random.choice(np.asarray(line_choices)))
+            delta = direction * 120 * lines  # 120 整数倍，随机1~3格
+            PostMessage(handle, WM_MOUSEWHEEL, MAKELONG(0, delta), lparam)
+            time.sleep(float(np.random.uniform(gap_range[0], gap_range[1])))
 
 
 
