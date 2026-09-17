@@ -1,0 +1,36 @@
+name: 'Upstream Sync'
+
+permissions:
+  contents: write
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # 每天 UTC 00:00（北京时间 08:00）
+  workflow_dispatch:
+
+jobs:
+  sync_master:
+    runs-on: ubuntu-latest
+    name: Sync master from runhey
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Sync upstream master
+        id: sync
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4.1
+        with:
+          target_sync_branch: master
+          upstream_sync_branch: master
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          upstream_sync_repo: runhey/OnmyojiAutoScript
+
+      - name: Sync result
+        run: |
+          if [ "${{ steps.sync.outputs.has_new_commits }}" = "true" ]; then
+            echo "New upstream commits merged into master."
+          else
+            echo "master is already up-to-date."
+          fi
