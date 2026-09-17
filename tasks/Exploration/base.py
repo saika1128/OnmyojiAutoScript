@@ -116,7 +116,7 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
         # 新版详情弹窗无红色返回：用探索+组队双按钮识别，命中则点左上金黄返回回大世界，避免空等50s
         self.screenshot()
         if self.appear(self.I_E_EXPLORATION_CLICK) and self.appear(self.I_EXP_CREATE_TEAM):
-            self.click((36, 40))
+            self.appear_then_click(self.I_BACK_YOLLOW, interval=3.5)
             self.sleep(1)
         self.ui_get_current_page()
         self.ui_goto(page_main)

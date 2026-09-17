@@ -22,7 +22,9 @@ class GeneralBattleAssets:
 	# 固定阵容”，结算遮罩淡出的最后一下会点穿到详情页，误开式神录（进而触发音频扩展包弹窗卡死）
 	C_REWARD_1 = RuleClick(roi_front=(606,540,325,80), roi_back=(606,540,325,80), name="reward_1")
 	# description 
-	C_REWARD_2 = RuleClick(roi_front=(25,134,224,472), roi_back=(25,134,224,472), name="reward_2")
+	# 左侧连点区下沿上收 y606->485：原 y134-606 压着探索关卡左下的“年兽/妖气”限时入口
+	# (圆心约 y547、圆顶约 y500)，结算遮罩淡出最后一下点穿会误进，弹出“是否离开主线关卡并前往挑战”
+	C_REWARD_2 = RuleClick(roi_front=(25,134,224,351), roi_back=(25,134,224,351), name="reward_2")
 	# description 
 	C_REWARD_3 = RuleClick(roi_front=(1092,156,168,437), roi_back=(1092,156,168,437), name="reward_3")
 
