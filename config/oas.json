@@ -42,7 +42,7 @@
   "restart": {
     "scheduler": {
       "enable": false,
-      "next_run": "2026-09-16 09:55:23",
+      "next_run": "2026-09-17 11:52:14",
       "priority": 0,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
@@ -194,7 +194,7 @@
   "realm_raid": {
     "scheduler": {
       "enable": true,
-      "next_run": "2026-09-16 20:25:38",
+      "next_run": "2026-09-18 11:48:03",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
@@ -477,7 +477,7 @@
   "exploration": {
     "scheduler": {
       "enable": true,
-      "next_run": "2026-09-15 20:25:38",
+      "next_run": "2026-09-17 11:48:03",
       "priority": 5,
       "success_interval": "00 00:20:00",
       "failure_interval": "00 00:20:00",
@@ -491,8 +491,8 @@
       "buff_exp_50_click": false,
       "buff_exp_100_click": false,
       "user_status": "alone",
-      "limit_time": "05:00:00",
-      "minions_cnt": 30,
+      "limit_time": "23:59:59",
+      "minions_cnt": 9999,
       "exploration_level": "第二十八章",
       "auto_rotate": "是",
       "choose_rarity": "N卡",
