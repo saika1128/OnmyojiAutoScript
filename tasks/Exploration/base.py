@@ -38,6 +38,24 @@ class Scene(Enum):
     TEAM = 6  # 组队
 
 
+# 中文章节名 -> 章号：把 OCR 提取到的 "二十八章"/"十章"/"三章" 转成 int，无法解析返回 None
+_CN_DIGIT = {'零': 0, '〇': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4,
+             '五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
+
+
+def chapter_num(text):
+    m = re.search(r'([零〇一二三四五六七八九十百千两0-9]+)章', text)
+    if not m:
+        return None
+    s = m.group(1)
+    if s.isdigit():
+        return int(s)
+    if '十' in s:
+        a, _, b = s.partition('十')
+        tens = _CN_DIGIT.get(a, 1) if a else 1   # "十"=10，"二十"=20
+        ones = _CN_DIGIT.get(b, 0) if b else 0
+        return tens * 10 + ones
+    return _CN_DIGIT.get(s) if len(s) == 1 else None
 
 
 class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigami, SwitchSoul, ExplorationAssets):
@@ -133,7 +151,7 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
 
     # 打开指定的章节：先检测目标章是否在当前列表，在则点；不在才下滑，且全程有界
     def open_expect_level(self):
-        MAX_SWIPE = 15          # 总滑动硬上限（28章、每次跨约2行，最多8次到尾，15为冗余）
+        MAX_SWIPE = 20          # 总滑动硬上限（28章、每次跨约2行，最多8次到尾，20为冗余；真卡住由 stale 提前熔断）
         MAX_STALE = 3           # 连续多少次滑动后列表毫无变化即熔断（手势没作用于列表）
         MAX_SELECT = 8          # 选中章节循环硬上限
         swipeCount = 0
@@ -167,18 +185,17 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
                 continue
             if self.appear_then_click(self.I_UI_CONFIRM_SAMLL, interval=1):
                 continue
-            # 列表指纹：与上一轮可见章节比对，相同说明上一次滚动没让列表移动
-            sig = tuple(sorted(text1))
+            # 列表指纹：取当前可见的最大章号；向下找后章时最大章号应增大。
+            # 只比章号可免疫 OCR 把"第"识成"名/书/新"等噪声（旧指纹比整句，噪声会让它误判列表在动）
+            nums = [n for n in (chapter_num(t) for t in text1) if n is not None]
+            sig = max(nums) if nums else None
             staleCount = staleCount + 1 if (lastSig is not None and sig == lastSig) else 0
             lastSig = sig
-            # MuMu对阴阳师章节列表有鼠标滚轮优化：后台投递滚轮(向下=章号更大=找第28章)，
-            # 不移动系统真实鼠标、不抢前台，更贴近PC真人；非Windows通道才回退由下向上触屏滑
-            if hasattr(self, 'wheel_window_message'):
-                self.wheel_window_message(1150, 400, ticks=1, down=True)
-            else:
-                self.swipe([1150, 500], [1150, 300])
+            # 设备内触屏滑动（minitouch），由下向上滑让章节列表向下翻到更大章号；
+            # 后台 PostMessage 滚轮在 MuMu 后台/失焦时会被吞（实测连续15次列表零移动），弃用
+            self.swipe(self.S_SWIPE_LEVEL_DOWN, interval=1)
             swipeCount += 1
-            logger.info(f"Scroll level list {swipeCount} times (stale {staleCount}), levels: {text1}")
+            logger.info(f"Scroll level list {swipeCount} times (stale {staleCount}, max chapter {sig}), levels: {text1}")
             # 连续多次纹丝不动：手势未作用于列表，提前熔断而非空转
             if staleCount >= MAX_STALE:
                 raise GameStuckError(
