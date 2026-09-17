@@ -5,13 +5,13 @@
 极简循环，战前/战斗复用探索同款通用战斗组件 GeneralBattle 的战前准备，
 战斗结算按活动界面定制：
     活动主界面(挑战按钮) -> 点挑战 -> 准备/战斗 -> 胜利 ->
-    识别卷轴“获得奖励”标题 -> 在弹窗外围安全随机位置点一次关闭 ->
+    识别背景“胜利”大字的“利”字上半 -> 沿弹窗外围弧形安全带点一次关闭 ->
     回到活动主界面 -> 再挑战 …… 直到达到“挑战次数”上限。
 
 与探索的差别：
   1. 探索在 MAIN 场景滑动找怪，本活动“挑战”按钮固定在右下角，直接点；
-  2. 活动结算不是通用胜利徽章/“获得奖励”按钮，而是卷轴弹窗，
-     以“获得奖励”四字标题为结算标志，在用户标注的弹窗外围安全区点击关闭；
+  2. 活动结算不是通用胜利徽章/“获得奖励”按钮，而是卷轴弹窗，以背景固定的
+     “利”字上半为结算标志，在包裹卷轴下沿的弧形安全带（厚带二维散布）点击关闭；
   3. 本版不做战斗内随机点滑（random_click_swipt 关闭）。
 
 所有点击均走 self.* 规则通道，继承 humanize 偏移与随机；所有循环均带硬上限。
@@ -153,11 +153,11 @@ class ScriptTask(GameUi, GeneralBattle, VoidEliteAssets):
                 sleep(1.0)
                 return False
 
-            # 仍在准备页（battle_before 没点成时补点）
-            if self.is_in_prepare(False) and not self.is_in_real_battle(False):
-                self.appear_then_click(self.I_PREPARE_HIGHLIGHT, interval=0.8)
-                sleep(0.5)
-                continue
+            # 战斗等待阶段不再补点“准备”：battle_before 内部已负责在准备页循环点
+            # 准备；其超时返回后若在此再补点，会与战斗加载/界面切换竞争，且每次点击
+            # 会清空 BATTLE_STATUS_S 长等待标记，反而把正常加载误判成卡死（对齐上游
+            # a413ea6f 撤回“battle_before 超时补点准备”）。真没进战斗时交由
+            # BATTLE_TIMEOUT 超时按失败处理，由上层重启 / 导航自恢复。
 
             # 活动结算：出现“获得奖励”卷轴 -> 安全区点掉 -> 回主界面
             if self.appear(self.I_VOID_REWARD):
@@ -190,17 +190,15 @@ class ScriptTask(GameUi, GeneralBattle, VoidEliteAssets):
         在结算弹窗外围安全随机位置点击关闭（正常一次即可），
         然后等待回到活动主界面（挑战按钮重现）。
         """
+        arc = self.C_VOID_SAFE_ARC
+        # 本场结算的弧带整体慢漂一次；同一场若需补点，共享该偏移、各自在厚带内采样
+        arc.begin_settlement()
         for click_i in range(self.MAX_DISMISS_CLICK):
             self.screenshot()
             if not self.appear(self.I_VOID_REWARD):
                 break
-            action = random.choice([
-                self.C_VOID_SAFE_LEFT,
-                self.C_VOID_SAFE_RIGHT,
-                self.C_VOID_SAFE_BOTTOM,
-            ])
-            logger.info(f'Click void reward safe area ({action.name}), try {click_i + 1}')
-            self.appear_then_click(self.I_VOID_REWARD, action=action, interval=1.0)
+            logger.info(f'Click void reward safe arc, try {click_i + 1}')
+            self.appear_then_click(self.I_VOID_REWARD, action=arc, interval=1.0)
             sleep(1.2)
 
         self.screenshot()
