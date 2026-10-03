@@ -21,6 +21,7 @@ class MainType(str, Enum):
     COSTUME_MAIN_12 = 'costume_main_12'  # 龙吟溯玉
     COSTUME_MAIN_13 = 'costume_main_13'  # 云景阆苑
     COSTUME_MAIN_14 = 'costume_main_14'  # 雪月华庭
+    COSTUME_MAIN_16 = 'costume_main_16'  # 狐栖归处
     COSTUME_MAIN_17 = 'costume_main_17'  # 玉岚狐庭
 
 # 结界皮肤

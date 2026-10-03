@@ -24,6 +24,14 @@ main_costume_model = {
         'I_PET_HOUSE': f'I_PET_HOUSE_{i}'
     } for i in range(1, 15)
 }
+# 狐栖归处：单帧皮肤
+main_costume_model[getattr(MainType, "COSTUME_MAIN_16")] = {
+    'I_CHECK_MAIN': 'I_CHECK_MAIN_16',
+    'I_MAIN_GOTO_EXPLORATION': 'I_MAIN_GOTO_EXPLORATION_16',
+    'I_MAIN_GOTO_SUMMON': 'I_MAIN_GOTO_SUMMON_16',
+    'I_MAIN_GOTO_TOWN': 'I_MAIN_GOTO_TOWN_16',
+    'I_PET_HOUSE': 'I_PET_HOUSE_16',
+}
 # 玉岚狐庭（issue #1824）：时变皮肤，每个入口为多帧 GIF
 main_costume_model[getattr(MainType, "COSTUME_MAIN_17")] = {
     'I_CHECK_MAIN': ['I_CHECK_MAIN_17_A', 'I_CHECK_MAIN_17_B', 'I_CHECK_MAIN_17_C'],
