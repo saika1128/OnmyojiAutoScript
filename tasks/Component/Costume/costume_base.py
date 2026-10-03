@@ -3,6 +3,7 @@
 # github https://github.com/runhey
 
 from module.atom.image import RuleImage
+from module.atom.gif import RuleGif
 from module.logger import logger
 
 from tasks.Component.Costume.config import (MainType, CostumeConfig, RealmType,
@@ -22,6 +23,14 @@ main_costume_model = {
         'I_MAIN_GOTO_TOWN': f'I_MAIN_GOTO_TOWN_{i}',
         'I_PET_HOUSE': f'I_PET_HOUSE_{i}'
     } for i in range(1, 15)
+}
+# 玉岚狐庭（issue #1824）：时变皮肤，每个入口为多帧 GIF
+main_costume_model[getattr(MainType, "COSTUME_MAIN_17")] = {
+    'I_CHECK_MAIN': ['I_CHECK_MAIN_17_A', 'I_CHECK_MAIN_17_B', 'I_CHECK_MAIN_17_C'],
+    'I_MAIN_GOTO_EXPLORATION': ['I_MAIN_GOTO_EXPLORATION_17_A', 'I_MAIN_GOTO_EXPLORATION_17_B', 'I_MAIN_GOTO_EXPLORATION_17_C'],
+    'I_MAIN_GOTO_SUMMON': ['I_MAIN_GOTO_SUMMON_17_A', 'I_MAIN_GOTO_SUMMON_17_B', 'I_MAIN_GOTO_SUMMON_17_C'],
+    'I_MAIN_GOTO_TOWN': ['I_MAIN_GOTO_TOWN_17_A', 'I_MAIN_GOTO_TOWN_17_B', 'I_MAIN_GOTO_TOWN_17_C'],
+    'I_PET_HOUSE': ['I_PET_HOUSE_17_A', 'I_PET_HOUSE_17_B', 'I_PET_HOUSE_17_C'],
 }
 
 
@@ -109,8 +118,15 @@ class CostumeBase:
         logger.info(f'Switch main costume to {main_type}')
         costume_assets = CostumeAssets()
         for key, value in main_costume_model[main_type].items():
-            assert_value: RuleImage = getattr(costume_assets, value)
-            self.replace_img(key, assert_value)
+            if isinstance(value, list):
+                # 多帧 GIF：原地挂载到现有 RuleImage，持有引用的页面/导航立即生效
+                if not hasattr(self, key):
+                    continue
+                rules: list[RuleImage] = [getattr(costume_assets, item) for item in value]
+                RuleGif.attach_to(getattr(self, key), rules)
+            else:
+                assert_value: RuleImage = getattr(costume_assets, value)
+                self.replace_img(key, assert_value)
 
     def check_costume_carpbanner(self, carpbanner_type: CarpBannerType):
         if carpbanner_type == CarpBannerType.COSTUME_CARPBANNER_DEFAULT:

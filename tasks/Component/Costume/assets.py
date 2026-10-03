@@ -89,6 +89,39 @@ class CostumeAssets:
 
 
 	# Image Rule Assets
+	# 玉岚狐庭 庭院判定 a
+	I_CHECK_MAIN_17_A = RuleImage(roi_front=(260,168,80,54), roi_back=(180,100,240,180), threshold=0.8, method="Template matching", file="./tasks/Component/Costume/main17/main17_check_main_17_a.png")
+	# 玉岚狐庭 庭院判定 b
+	I_CHECK_MAIN_17_B = RuleImage(roi_front=(260,168,80,54), roi_back=(180,100,240,180), threshold=0.8, method="Template matching", file="./tasks/Component/Costume/main17/main17_check_main_17_b.png")
+	# 玉岚狐庭 庭院判定 c
+	I_CHECK_MAIN_17_C = RuleImage(roi_front=(260,168,80,54), roi_back=(180,100,240,180), threshold=0.8, method="Template matching", file="./tasks/Component/Costume/main17/main17_check_main_17_c.png")
+	# 玉岚狐庭 探索 a
+	I_MAIN_GOTO_EXPLORATION_17_A = RuleImage(roi_front=(714,224,43,40), roi_back=(680,180,130,150), threshold=0.55, method="Template matching", file="./tasks/Component/Costume/main17/main17_main_goto_exploration_17_a.png")
+	# 玉岚狐庭 探索 b
+	I_MAIN_GOTO_EXPLORATION_17_B = RuleImage(roi_front=(719,216,41,42), roi_back=(667,180,143,106), threshold=0.55, method="Template matching", file="./tasks/Component/Costume/main17/main17_main_goto_exploration_17_b.png")
+	# 玉岚狐庭 探索 c
+	I_MAIN_GOTO_EXPLORATION_17_C = RuleImage(roi_front=(717,222,43,42), roi_back=(680,180,125,110), threshold=0.55, method="Template matching", file="./tasks/Component/Costume/main17/main17_main_goto_exploration_17_c.png")
+	# 玉岚狐庭 召唤屋 a
+	I_MAIN_GOTO_SUMMON_17_A = RuleImage(roi_front=(981,218,40,41), roi_back=(930,170,130,150), threshold=0.55, method="Template matching", file="./tasks/Component/Costume/main17/main17_main_goto_summon_17_a.png")
+	# 玉岚狐庭 召唤屋 b
+	I_MAIN_GOTO_SUMMON_17_B = RuleImage(roi_front=(981,218,39,38), roi_back=(930,170,130,150), threshold=0.55, method="Template matching", file="./tasks/Component/Costume/main17/main17_main_goto_summon_17_b.png")
+	# 玉岚狐庭 召唤屋 c
+	I_MAIN_GOTO_SUMMON_17_C = RuleImage(roi_front=(981,218,39,37), roi_back=(930,170,130,150), threshold=0.55, method="Template matching", file="./tasks/Component/Costume/main17/main17_main_goto_summon_17_c.png")
+	# 玉岚狐庭 町中 a
+	I_MAIN_GOTO_TOWN_17_A = RuleImage(roi_front=(1004,336,35,49), roi_back=(960,300,100,120), threshold=0.8, method="Template matching", file="./tasks/Component/Costume/main17/main17_main_goto_town_17_a.png")
+	# 玉岚狐庭 町中 b
+	I_MAIN_GOTO_TOWN_17_B = RuleImage(roi_front=(1007,346,26,31), roi_back=(960,300,100,120), threshold=0.8, method="Template matching", file="./tasks/Component/Costume/main17/main17_main_goto_town_17_b.png")
+	# 玉岚狐庭 町中 c
+	I_MAIN_GOTO_TOWN_17_C = RuleImage(roi_front=(1008,343,29,43), roi_back=(960,300,100,120), threshold=0.8, method="Template matching", file="./tasks/Component/Costume/main17/main17_main_goto_town_17_c.png")
+	# 玉岚狐庭 宠物屋 a
+	I_PET_HOUSE_17_A = RuleImage(roi_front=(1249,404,23,56), roi_back=(1231,340,49,154), threshold=0.8, method="Template matching", file="./tasks/Component/Costume/main17/main17_pet_house_17_a.png")
+	# 玉岚狐庭 宠物屋 b
+	I_PET_HOUSE_17_B = RuleImage(roi_front=(1251,417,19,45), roi_back=(1231,366,49,124), threshold=0.8, method="Template matching", file="./tasks/Component/Costume/main17/main17_pet_house_17_b.png")
+	# 玉岚狐庭 宠物屋 c
+	I_PET_HOUSE_17_C = RuleImage(roi_front=(1248,406,19,59), roi_back=(1228,340,52,176), threshold=0.8, method="Template matching", file="./tasks/Component/Costume/main17/main17_pet_house_17_c.png")
+
+
+	# Image Rule Assets
 	# description 
 	I_CHECK_MAIN_2 = RuleImage(roi_front=(1090,146,48,55), roi_back=(880,108,271,100), threshold=0.8, method="Template matching", file="./tasks/Component/Costume/main2/main2_check_main_2.png")
 	# description 
